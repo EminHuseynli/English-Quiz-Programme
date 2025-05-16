@@ -1,15 +1,18 @@
+
 import time
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 from tkinter import ttk
 import random
 from PIL import Image, ImageTk
 import pyttsx3
 import speech_recognition as sr
-from PIL.ImageOps import expand
+import csv
+import os
 
 from questions import Questions
 from voice_questions import VoiceQuestions
+
 
 class QuizGame:
     def __init__(self, root):
@@ -19,23 +22,32 @@ class QuizGame:
 
         self.engine = pyttsx3.init()
 
+        self.nickname = simpledialog.askstring("Nickname", "Enter your nickname:")
+        if not self.nickname:
+            self.nickname = "Anonymous"
+
         self.background_image = Image.open("quizz.jpg")
         self.background_photo = ImageTk.PhotoImage(self.background_image)
 
         self.background_label = tk.Label(self.root, image=self.background_photo)
         self.background_label.place(relwidth=1, relheight=1)
-
         self.root.bind("<Configure>", self.resize_background)
 
         self.index = 0
-        self.score = 0
         self.voice_index = 0
+        self.score = 0
 
-        self.selected_questions = random.sample(Questions, 5)
+        self.start_time = time.time()
+
+        self.selected_questions = random.sample(Questions, 3)
         self.selected_voice_questions = random.sample(VoiceQuestions, 5)
 
         self.frame = tk.Frame(root, relief=tk.RAISED, bd=5, bg='#2d3250')
         self.frame.place(relx=0.5, rely=0.5, anchor="center", width=750, height=400)
+
+        self.timer_label = tk.Label(self.root, text="Time: 00:00", font=("Arial", 30), bg="black", fg="white")
+        self.timer_label.place(x=640, y=10)
+        self.update_timer()
 
         self.question_label = tk.Label(self.frame, text="", font=("Arial", 16), wraplength=500, justify="center", bg='#2d3250', fg="White")
         self.question_label.pack(pady=20, expand=True)
@@ -70,6 +82,13 @@ class QuizGame:
         self.background_image = self.background_image.resize((new_width, new_height))
         self.background_photo = ImageTk.PhotoImage(self.background_image)
         self.background_label.config(image=self.background_photo)
+
+    def update_timer(self):
+        elapsed = int(time.time() - self.start_time)
+        minutes = elapsed // 60
+        seconds = elapsed % 60
+        self.timer_label.config(text=f"Time: {minutes:02d}:{seconds:02d}")
+        self.root.after(1000, self.update_timer)
 
     def display_new_question(self):
         if self.index < len(self.selected_questions):
@@ -137,7 +156,7 @@ class QuizGame:
                     self.mic_button.config(bg="green")
                 else:
                     self.mic_button.config(bg="red")
-            except Exception as e:
+            except Exception:
                 self.mic_button.config(bg="red")
 
         self.root.after(1500, self.next_voice_question)
@@ -148,8 +167,38 @@ class QuizGame:
         self.display_voice_question()
 
     def show_results(self):
-        messagebox.showinfo("Results", f"Quiz completed! Your score: {self.score}/{len(self.selected_questions) + len(self.selected_voice_questions)}")
+        total_time = int(time.time() - self.start_time)
+        self.save_leaderboard(self.nickname, self.score, total_time)
+        rankings = self.load_leaderboard()
+
+        result_text = f"Your score: {self.score}/{len(self.selected_questions) + len(self.selected_voice_questions)}\n\nLeaderboard:\n"
+        for i, entry in enumerate(rankings, start=1):
+            result_text += f"{i}. {entry['nickname']} - Score: {entry['score']}, Time: {entry['time']}s\n"
+
+        messagebox.showinfo("Results", result_text)
         self.root.destroy()
+
+    def save_leaderboard(self, nickname, score, total_time):
+        file_exists = os.path.exists("leaderboard.csv")
+        with open("leaderboard.csv", mode="a", newline='') as file:
+            writer = csv.writer(file)
+            if not file_exists:
+                writer.writerow(["nickname", "score", "time"])
+            writer.writerow([nickname, score, total_time])
+
+    def load_leaderboard(self):
+        entries = []
+        if os.path.exists("leaderboard.csv"):
+            with open("leaderboard.csv", mode="r") as file:
+                reader = csv.DictReader(file)
+                for row in reader:
+                    entries.append({
+                        "nickname": row["nickname"],
+                        "score": int(row["score"]),
+                        "time": int(row["time"])
+                    })
+        return sorted(entries, key=lambda x: (-x["score"], x["time"]))
+
 
 if __name__ == "__main__":
     root = tk.Tk()
