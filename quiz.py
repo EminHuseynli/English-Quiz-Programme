@@ -33,6 +33,9 @@ class QuizGame:
         self.background_label.place(relwidth=1, relheight=1)
         self.root.bind("<Configure>", self.resize_background)
 
+        self.skip_button = tk.Button(self.root, text=">", font=("Arial", 24), command=self.skip_question, bg="red", fg="white")
+        self.skip_button.place(relx=0.95, rely=0.5, anchor="e")
+
         self.index = 0
         self.voice_index = 0
         self.score = 0
@@ -198,6 +201,15 @@ class QuizGame:
                         "time": int(row["time"])
                     })
         return sorted(entries, key=lambda x: (-x["score"], x["time"]))
+
+    def skip_question(self):
+        if self.index < len(self.selected_questions):
+            self.index += 1
+            self.display_new_question()
+        elif self.voice_index < len(self.selected_voice_questions):
+            self.voice_index += 1
+            self.clear_screen()
+            self.display_voice_question()
 
 
 if __name__ == "__main__":
